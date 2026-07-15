@@ -3,7 +3,7 @@ from supabase import create_client, Client
 
 # --- 1. Supabaseの接続設定 ---
 # さきほどメモした2つを、以下の "" の中に貼り付けてください。
-SUPABASE_URL = "https://ttagggrpemnkkrfsgbyd.supabase.co/rest/v1/"
+SUPABASE_URL = "https://ttagggrpemnkkrfsgbyd.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR0YWdnZ3JwZW1ua2tyZnNnYnlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwOTMzMzQsImV4cCI6MjA5OTY2OTMzNH0.jbBD3eENhAgrwa1nTy4IM_ToHidGqR-ocXkzPlEOitQ"
 
 # 接続クライアントを作成
