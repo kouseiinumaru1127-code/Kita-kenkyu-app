@@ -1,28 +1,36 @@
 import streamlit as st
+import time
 from supabase import create_client, Client
 
-# --- 1. Supabaseの接続設定 ---
-# さきほどメモした2つを、以下の "" の中に貼り付けてください。
+# --- 設定（あなたのSupabaseキーをここに入れてください） ---
 SUPABASE_URL = "https://ttagggrpemnkkrfsgbyd.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR0YWdnZ3JwZW1ua2tyZnNnYnlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwOTMzMzQsImV4cCI6MjA5OTY2OTMzNH0.jbBD3eENhAgrwa1nTy4IM_ToHidGqR-ocXkzPlEOitQ"
-
-# 接続クライアントを作成
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-st.title("接続テスト画面")
+st.title("📚 学習タイマー")
 
-# --- 2. データの取得テスト ---
-st.write("Supabaseからデータを取得しています...")
+# 1. ユーザー選択
+users = supabase.table("users").select("*").execute().data
+user_names = {u["name"]: u["id"] for u in users}
+selected_user = st.selectbox("ユーザーを選択", list(user_names.keys()))
 
-try:
-    # 先ほど作成した users テーブルからデータを取得
-    response = supabase.table("users").select("*").execute()
+# 2. タイマー機能
+if st.button("学習開始"):
+    with st.spinner("学習中...（終わったら下のボタンを押してね）"):
+        time.sleep(5)  # テスト用に5秒だけ待つ設定
+        
+    st.success("終了！記録を保存します")
     
-    # 取得したデータを画面に表示
-    st.success("✅ Supabaseへの接続とデータの取得に成功しました！")
-    st.write("▼ users テーブルの中身:")
-    st.json(response.data)
+    # Supabaseに保存
+    data = {
+        "user_id": user_names[selected_user],
+        "duration_seconds": 5,
+        "category": "数学"
+    }
+    supabase.table("study_logs").insert(data).execute()
+    st.write("記録が保存されました！")
 
-except Exception as e:
-    st.error("❌ 接続に失敗しました。URLとAPI Keyを確認してください。")
-    st.write(f"エラーの詳細: {e}")
+# 3. 記録表示
+st.subheader("現在の学習記録")
+logs = supabase.table("study_logs").select("*, users(name)").execute().data
+st.write(logs)
