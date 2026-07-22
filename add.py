@@ -1,6 +1,6 @@
 import streamlit as st
 import time
-from supabase import create_client, Client
+import pandas as pd
 
 # --- 設定 ---
 SUPABASE_URL = "https://ttagggrpemnkkrfsgbyd.supabase.co"
@@ -106,3 +106,49 @@ try:
         st.write("まだ記録はありません。学習を開始してみましょう！")
 except Exception as e:
     st.write("記録の読み込みに失敗しました。")
+
+st.divider()
+
+# --- 5. ランキング＆グラフ ---
+st.subheader("🏆 ランキング＆グラフ")
+try:
+    # 学習記録をすべて取得
+    all_logs = supabase.table("study_logs").select("duration_seconds, users(name)").execute().data
+    
+    if all_logs:
+        # ユーザーごとの合計時間を計算する辞書（入れ物）を作成
+        user_totals = {}
+        for log in all_logs:
+            # ユーザー名がちゃんとあるデータだけ処理する
+            if log.get("users") and log["users"].get("name"):
+                name = log["users"]["name"]
+                duration = log.get("duration_seconds", 0)
+                
+                # 既に名前があれば足し算、なければ新しく時間を入れる
+                if name in user_totals:
+                    user_totals[name] += duration
+                else:
+                    user_totals[name] = duration
+        
+        # グラフや表を描くために、データを整理（Pandasを使います）
+        df = pd.DataFrame(list(user_totals.items()), columns=["名前", "合計学習時間(秒)"])
+        # 合計時間が長い順（降順）に並べ替え
+        df = df.sort_values(by="合計学習時間(秒)", ascending=False).reset_index(drop=True)
+        
+        # 画面を左右2分割にする
+        col1, col2 = st.columns(2) 
+        
+        with col1:
+            st.write("🥇 **ランキング表**")
+            st.dataframe(df)
+        
+        with col2:
+            st.write("📈 **グラフ**")
+            # グラフ用に「名前」を基準（インデックス）に設定して棒グラフを描画
+            st.bar_chart(df.set_index("名前"))
+            
+    else:
+        st.write("まだ誰も学習していません。一番乗りを目指しましょう！")
+        
+except Exception as e:
+    st.write(f"ランキングの読み込みに失敗しました: {e}")
