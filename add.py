@@ -54,6 +54,11 @@ if selected_user_id:
     if "start_time" not in st.session_state:
         st.session_state.start_time = None
 
+    # --- 🌟追加：科目選択プルダウン ---
+    categories = ["数学", "英語", "国語", "理科", "社会", "プログラミング", "読書", "その他"]
+    # disabled=... をつけることで、タイマー作動中は科目を変更できないようにロックします
+    selected_category = st.selectbox("学習する科目を選んでください", categories, disabled=st.session_state.is_running)
+
     if not st.session_state.is_running:
         # 止まっている時：開始ボタン
         if st.button("学習開始！", type="primary"):
@@ -77,7 +82,7 @@ if selected_user_id:
             data = {
                 "user_id": selected_user_id,
                 "duration_seconds": duration,
-                "category": "数学" # 最初は「数学」で固定しておきます
+                "category": selected_category # 🌟変更：「数学」固定から、選んだ科目に変更
             }
             try:
                 supabase.table("study_logs").insert(data).execute()
