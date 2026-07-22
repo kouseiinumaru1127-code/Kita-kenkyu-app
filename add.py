@@ -72,7 +72,7 @@ if selected_user_id:
     # デフォルト科目 ＋ 自分が追加した科目を取得
     default_categories = ["数学", "英語", "国語", "理科", "社会", "プログラミング", "読書", "その他"]
     try:
-        custom_subjects_data = supabase.table("subjects").select("name").eq("user_id", selected_user_id).execute().data
+        custom_subjects_data = supabase.table("subjects").select("id, name").eq("user_id", selected_user_id).execute().data
         custom_subjects = [s["name"] for s in custom_subjects_data] if custom_subjects_data else []
     except:
         custom_subjects = []
@@ -145,8 +145,7 @@ try:
                 with col_a:
                     st.text(f"👤 {row['user_name']} | 📖 {row['category']} | ⏱️ {row['duration_seconds']}秒 | 📅 {row['created_at']}")
                 with col_b:
-                    # 履歴のIDを指定して削除するボタン
-                    if st.button("削除", key=f"del_{row['id']}"):
+                    if st.button("削除", key=f"del_log_{row['id']}"):
                         try:
                             supabase.table("study_logs").delete().eq("id", row['id']).execute()
                             st.success("履歴を削除しました！")
@@ -157,3 +156,53 @@ try:
         st.write("まだ学習記録はありません。タイマーを動かして記録を残しましょう！")
 except Exception as e:
     st.write(f"記録の読み込みに失敗しました: {e}")
+
+# --- 6. ユーザー・科目の管理（削除機能） ---
+st.divider()
+with st.expander("⚙️ ユーザー・科目の管理（削除）"):
+    tab1, tab2 = st.tabs(["👤 ユーザー削除", "📚 追加した科目の削除"])
+    
+    with tab1:
+        st.write("登録されているユーザーを削除します。（※関連する学習記録も一緒に削除されます）")
+        try:
+            users_res = supabase.table("users").select("*").execute().data
+            if users_res:
+                user_del_dict = {u["name"]: u["id"] for u in users_res}
+                target_user = st.selectbox("削除するユーザーを選んでください", list(user_del_dict.keys()), key="del_user_select")
+                if st.button("このユーザーを削除する", type="primary"):
+                    try:
+                        supabase.table("users").delete().eq("id", user_del_dict[target_user]).execute()
+                        st.success(f"ユーザー「{target_user}」を削除しました！")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"削除失敗: {e}")
+            else:
+                st.write("登録されているユーザーがいません。")
+        except Exception as e:
+            st.write(f"ユーザー一覧の取得に失敗しました: {e}")
+            
+    with tab2:
+        st.write("自分で追加したオリジナル科目を削除します。")
+        try:
+            subs_res = supabase.table("subjects").select("*, users(name)").execute().data
+            if subs_res:
+                sub_list = []
+                for s in subs_res:
+                    u_name = s["users"]["name"] if isinstance(s.get("users"), dict) else "不明"
+                    sub_list.append({"label": f"{s['name']} (登録者: {u_name})", "id": s["id"]})
+                
+                sub_labels = [item["label"] for item in sub_list]
+                target_sub_label = st.selectbox("削除する科目を選んでください", sub_labels, key="del_sub_select")
+                
+                if st.button("この科目を削除する", type="primary"):
+                    target_id = next(item["id"] for item in sub_list if item["label"] == target_sub_label)
+                    try:
+                        supabase.table("subjects").delete().eq("id", target_id).execute()
+                        st.success("科目を削除しました！")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"削除失敗: {e}")
+            else:
+                st.write("追加されたオリジナル科目はありません。")
+        except Exception as e:
+            st.write(f"科目一覧の取得に失敗しました: {e}")
