@@ -45,9 +45,12 @@ except Exception as e:
     st.error(f"データ取得エラー: {e}")
     selected_user_id = None
 
-# --- 3. タイマー機能 ---
+# --- 3. タイマー機能（通常 ＆ ポモドーロ切り替え） ---
 if selected_user_id:
     st.subheader("⏱️ タイマー")
+    
+    # タイマーモードの選択
+    timer_mode = st.radio("タイマーのモードを選んでください", ["通常ストップウォッチ", "ポモドーロ（集中25分 / 休憩5分）"], horizontal=True)
     
     # ユーザーが自分で科目を追加する機能
     with st.expander("➕ 新しい科目を自分で追加する"):
@@ -63,12 +66,6 @@ if selected_user_id:
             else:
                 st.warning("科目名を入力してください。")
     
-    # タイマーの状態を保持
-    if "is_running" not in st.session_state:
-        st.session_state.is_running = False
-    if "start_time" not in st.session_state:
-        st.session_state.start_time = None
-
     # デフォルト科目 ＋ 自分が追加した科目を取得
     default_categories = ["数学", "英語", "国語", "理科", "社会", "プログラミング", "読書", "その他"]
     try:
@@ -79,36 +76,109 @@ if selected_user_id:
 
     categories = list(dict.fromkeys(default_categories + custom_subjects))
     
+    # セッション状態の初期化
+    if "is_running" not in st.session_state:
+        st.session_state.is_running = False
+    if "start_time" not in st.session_state:
+        st.session_state.start_time = None
+    if "pomo_phase" not in st.session_state:
+        st.session_state.pomo_phase = "study" # "study" (集中25分) または "break" (休憩5分)
+
     # タイマー作動中は科目を変更できないようにロック
     selected_category = st.selectbox("学習する科目を選んでください", categories, disabled=st.session_state.is_running)
 
-    if not st.session_state.is_running:
-        if st.button("学習開始！", type="primary"):
-            st.session_state.is_running = True
-            st.session_state.start_time = time.time()
-            st.rerun()
-    else:
-        elapsed_seconds = int(time.time() - st.session_state.start_time)
-        minutes = elapsed_seconds // 60
-        seconds = elapsed_seconds % 60
-        st.info(f"⏳ 勉強中... 経過時間: **{minutes}分 {seconds}秒**")
-        
-        if st.button("学習終了！記録を保存", type="primary"):
-            duration = int(time.time() - st.session_state.start_time)
-            st.session_state.is_running = False
-            st.session_state.start_time = None
-            
-            data = {
-                "user_id": selected_user_id,
-                "duration_seconds": duration,
-                "category": selected_category
-            }
-            try:
-                supabase.table("study_logs").insert(data).execute()
-                st.success(f"{duration}秒間の学習を記録しました！")
+    # --- モード別の処理 ---
+    if timer_mode == "通常ストップウォッチ":
+        if not st.session_state.is_running:
+            if st.button("学習開始！", type="primary"):
+                st.session_state.is_running = True
+                st.session_state.start_time = time.time()
                 st.rerun()
-            except Exception as e:
-                st.error(f"保存失敗: {e}")
+        else:
+            elapsed_seconds = int(time.time() - st.session_state.start_time)
+            minutes = elapsed_seconds // 60
+            seconds = elapsed_seconds % 60
+            st.info(f"⏳ 勉強中... 経過時間: **{minutes}分 {seconds}秒**")
+            
+            if st.button("学習終了！記録を保存", type="primary"):
+                duration = int(time.time() - st.session_state.start_time)
+                st.session_state.is_running = False
+                st.session_state.start_time = None
+                
+                data = {
+                    "user_id": selected_user_id,
+                    "duration_seconds": duration,
+                    "category": selected_category
+                }
+                try:
+                    supabase.table("study_logs").insert(data).execute()
+                    st.success(f"{duration}秒間の学習を記録しました！")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"保存失敗: {e}")
+
+    else:
+        # ポモドーロモード（集中25分 = 1500秒、休憩5分 = 300秒）
+        STUDY_TIME = 25 * 60
+        BREAK_TIME = 5 * 60
+
+        if not st.session_state.is_running:
+            if st.button("ポモドーロ開始（25分集中）", type="primary"):
+                st.session_state.is_running = True
+                st.session_state.start_time = time.time()
+                st.session_state.pomo_phase = "study"
+                st.rerun()
+        else:
+            elapsed = int(time.time() - st.session_state.start_time)
+            
+            if st.session_state.pomo_phase == "study":
+                remaining = STUDY_TIME - elapsed
+                if remaining > 0:
+                    rem_min = remaining // 60
+                    rem_sec = remaining % 60
+                    st.info(f"🍅 **集中タイム中！** 残り時間: **{rem_min}分 {rem_sec}秒**")
+                    # 画面を自動で1秒ごとに更新させるためのリロード（Streamlitの仕組み）
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    # 25分終了 -> 休憩フェーズへ移行（自動で25分分をデータベースに記録！）
+                    try:
+                        data = {
+                            "user_id": selected_user_id,
+                            "duration_seconds": STUDY_TIME,
+                            "category": selected_category
+                        }
+                        supabase.table("study_logs").insert(data).execute()
+                        st.success("🎉 25分集中達成！自動で記録しました。次は5分間の休憩です！")
+                    except Exception as e:
+                        st.error(f"自動保存失敗: {e}")
+                    
+                    st.session_state.pomo_phase = "break"
+                    st.session_state.start_time = time.time()
+                    st.rerun()
+            
+            else:
+                # 休憩フェーズ（5分）
+                remaining = BREAK_TIME - elapsed
+                if remaining > 0:
+                    rem_min = remaining // 60
+                    rem_sec = remaining % 60
+                    st.warning(f"☕ **休憩タイム中...** 残り時間: **{rem_min}分 {rem_sec}秒**")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.success("☕ 休憩終了！お疲れ様でした。")
+                    st.session_state.is_running = False
+                    st.session_state.start_time = None
+                    st.session_state.pomo_phase = "study"
+                    st.rerun()
+
+            # ポモドーロを途中で中断したいとき用
+            if st.button("ポモドーロを中断する"):
+                st.session_state.is_running = False
+                st.session_state.start_time = None
+                st.session_state.pomo_phase = "study"
+                st.rerun()
 
 # --- 4. 記録表示 ＆ ランキング（左右分割ダッシュボード） ---
 st.divider()
@@ -118,15 +188,12 @@ try:
     logs = supabase.table("study_logs").select("*, users(name)").execute().data
     if logs:
         df = pd.DataFrame(logs)
-        # users(name) の入れ子構造から名前を取り出す
         df["user_name"] = df["users"].apply(lambda x: x["name"] if isinstance(x, dict) else "不明")
         
-        # 画面を左右に分割
         col1, col2 = st.columns(2)
         
         with col1:
             st.markdown("### 🏆 ユーザー別 合計学習時間")
-            # ユーザーごとの合計秒数を計算
             ranking_df = df.groupby("user_name")["duration_seconds"].sum().reset_index()
             ranking_df["学習時間(分)"] = (ranking_df["duration_seconds"] / 60).round(1)
             ranking_df = ranking_df.sort_values(by="duration_seconds", ascending=False)
@@ -137,7 +204,6 @@ try:
             chart_data = ranking_df.set_index("user_name")["学習時間(分)"]
             st.bar_chart(chart_data)
             
-        # --- 5. 履歴の確認 ＆ 削除機能 ---
         with st.expander("📝 すべての履歴を見る・削除する"):
             st.write("間違えて記録してしまったデータを個別に削除できます。")
             for index, row in df.iterrows():
@@ -157,7 +223,7 @@ try:
 except Exception as e:
     st.write(f"記録の読み込みに失敗しました: {e}")
 
-# --- 6. ユーザー・科目の管理（削除機能） ---
+# --- 5. ユーザー・科目の管理（削除機能） ---
 st.divider()
 with st.expander("⚙️ ユーザー・科目の管理（削除）"):
     tab1, tab2 = st.tabs(["👤 ユーザー削除", "📚 追加した科目の削除"])
