@@ -77,6 +77,4 @@ try:
         st.write("まだ記録はありません。")
 except Exception as e:
     st.write("記録の読み込みに失敗しました。")
-```
-
 
