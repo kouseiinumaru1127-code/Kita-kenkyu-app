@@ -160,6 +160,15 @@ if selected_user_id:
                     rem_min = remaining // 60
                     rem_sec = remaining % 60
                     st.info(f"🍅 **集中タイム中！** 残り時間: **{rem_min}分 {rem_sec}秒**")
+                    
+                    # 途中中断ボタンを配置
+                    if st.button("ポモドーロを中断する"):
+                        st.session_state.is_running = False
+                        st.session_state.start_time = None
+                        st.session_state.pomo_phase = "study"
+                        st.warning("ポモドーロを中断しました。")
+                        st.rerun()
+                        
                     time.sleep(1)
                     st.rerun()
                 else:
@@ -184,6 +193,13 @@ if selected_user_id:
                     rem_min = remaining // 60
                     rem_sec = remaining % 60
                     st.warning(f"☕ **休憩タイム中...** 残り時間: **{rem_min}分 {rem_sec}秒**")
+                    
+                    if st.button("休憩を終了してリセット"):
+                        st.session_state.is_running = False
+                        st.session_state.start_time = None
+                        st.session_state.pomo_phase = "study"
+                        st.rerun()
+                        
                     time.sleep(1)
                     st.rerun()
                 else:
@@ -192,12 +208,6 @@ if selected_user_id:
                     st.session_state.start_time = None
                     st.session_state.pomo_phase = "study"
                     st.rerun()
-
-            if st.button("ポモドーロを中断する"):
-                st.session_state.is_running = False
-                st.session_state.start_time = None
-                st.session_state.pomo_phase = "study"
-                st.rerun()
 
 # --- 5. 記録表示 ＆ ランキング（左右分割ダッシュボード） ---
 st.divider()
@@ -279,10 +289,7 @@ with st.expander("⚙️ ユーザー・科目の管理（削除）"):
                 sub_labels = [item["label"] for item in sub_list]
                 target_sub_label = st.selectbox("削除する科目を選んでください", sub_labels, key="del_sub_select")
                 
-                if st.button("this is ignored", type="primary", key="dummy_btn") == False: # UI placeholder
-                    pass
-                
-                if st.button("この科目を削除する", type="primary", key="del_sub_action"):
+                if st.button("この科目を削除する", type="primary"):
                     target_id = next(item["id"] for item in sub_list if item["label"] == target_sub_label)
                     try:
                         supabase.table("subjects").delete().eq("id", target_id).execute()
