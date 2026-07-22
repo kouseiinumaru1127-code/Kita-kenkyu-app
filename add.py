@@ -137,8 +137,22 @@ try:
             chart_data = ranking_df.set_index("user_name")["学習時間(分)"]
             st.bar_chart(chart_data)
             
-        with st.expander("📝 すべての履歴を見る"):
-            st.write(df[["user_name", "category", "duration_seconds", "created_at"]])
+        # --- 5. 履歴の確認 ＆ 削除機能 ---
+        with st.expander("📝 すべての履歴を見る・削除する"):
+            st.write("間違えて記録してしまったデータを個別に削除できます。")
+            for index, row in df.iterrows():
+                col_a, col_b = st.columns([4, 1])
+                with col_a:
+                    st.text(f"👤 {row['user_name']} | 📖 {row['category']} | ⏱️ {row['duration_seconds']}秒 | 📅 {row['created_at']}")
+                with col_b:
+                    # 履歴のIDを指定して削除するボタン
+                    if st.button("削除", key=f"del_{row['id']}"):
+                        try:
+                            supabase.table("study_logs").delete().eq("id", row['id']).execute()
+                            st.success("履歴を削除しました！")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"削除失敗: {e}")
     else:
         st.write("まだ学習記録はありません。タイマーを動かして記録を残しましょう！")
 except Exception as e:
