@@ -45,8 +45,31 @@ except Exception as e:
     st.error(f"データ取得エラー: {e}")
     selected_user_id = None
 
-# --- 3. タイマー機能（通常 ＆ ポモドーロ切り替え） ---
+# --- 3. 集中用BGMプレイヤー機能 ---
 if selected_user_id:
+    st.subheader("🎧 集中用BGM・環境音プレイヤー")
+    
+    # 著作権フリー・安全なストリーミング音源のサンプルURL（Lofi Hip Hop、雨音、環境音など）
+    bgm_options = {
+        "なし (静寂)": "",
+        "☕ Lofi Hip Hop (集中・作業用)": "https://commondatastorage.googleapis.com/codeskulptor-assets/Epoq-Lofi.ogg",
+        "🌧️ 雨音と雷 (リラックス)": "https://actions.google.com/sounds/v1/weather/rain_heavy_loud.ogg",
+        "🔥 暖炉の火の音 (落ち着き)": "https://actions.google.com/sounds/v1/ambiences/indoor_firepalace.ogg",
+        "🌲 森の鳥のさえずり (自然)": "https://actions.google.com/sounds/v1/ambiences/morning_birds.ogg"
+    }
+    
+    selected_bgm_label = st.selectbox("集中用のBGMや環境音を選んでください", list(bgm_options.keys()))
+    selected_bgm_url = bgm_options[selected_bgm_label]
+    
+    if selected_bgm_url:
+        # Streamlitのオーディオプレイヤー（自動再生・ループ対応）
+        st.audio(selected_bgm_url, format="audio/ogg", autoplay=True, loop=True)
+    else:
+        st.info("BGMはオフになっています。好きな環境音を選んで集中を高めましょう！")
+
+# --- 4. タイマー機能（通常 ＆ ポモドーロ切り替え） ---
+if selected_user_id:
+    st.divider()
     st.subheader("⏱️ タイマー")
     
     # タイマーモードの選択
@@ -82,7 +105,7 @@ if selected_user_id:
     if "start_time" not in st.session_state:
         st.session_state.start_time = None
     if "pomo_phase" not in st.session_state:
-        st.session_state.pomo_phase = "study" # "study" (集中25分) または "break" (休憩5分)
+        st.session_state.pomo_phase = "study"
 
     # タイマー作動中は科目を変更できないようにロック
     selected_category = st.selectbox("学習する科目を選んでください", categories, disabled=st.session_state.is_running)
@@ -137,11 +160,9 @@ if selected_user_id:
                     rem_min = remaining // 60
                     rem_sec = remaining % 60
                     st.info(f"🍅 **集中タイム中！** 残り時間: **{rem_min}分 {rem_sec}秒**")
-                    # 画面を自動で1秒ごとに更新させるためのリロード（Streamlitの仕組み）
                     time.sleep(1)
                     st.rerun()
                 else:
-                    # 25分終了 -> 休憩フェーズへ移行（自動で25分分をデータベースに記録！）
                     try:
                         data = {
                             "user_id": selected_user_id,
@@ -158,7 +179,6 @@ if selected_user_id:
                     st.rerun()
             
             else:
-                # 休憩フェーズ（5分）
                 remaining = BREAK_TIME - elapsed
                 if remaining > 0:
                     rem_min = remaining // 60
@@ -173,14 +193,13 @@ if selected_user_id:
                     st.session_state.pomo_phase = "study"
                     st.rerun()
 
-            # ポモドーロを途中で中断したいとき用
             if st.button("ポモドーロを中断する"):
                 st.session_state.is_running = False
                 st.session_state.start_time = None
                 st.session_state.pomo_phase = "study"
                 st.rerun()
 
-# --- 4. 記録表示 ＆ ランキング（左右分割ダッシュボード） ---
+# --- 5. 記録表示 ＆ ランキング（左右分割ダッシュボード） ---
 st.divider()
 st.subheader("📊 学習データ・ランキング")
 
@@ -223,7 +242,7 @@ try:
 except Exception as e:
     st.write(f"記録の読み込みに失敗しました: {e}")
 
-# --- 5. ユーザー・科目の管理（削除機能） ---
+# --- 6. ユーザー・科目の管理（削除機能） ---
 st.divider()
 with st.expander("⚙️ ユーザー・科目の管理（削除）"):
     tab1, tab2 = st.tabs(["👤 ユーザー削除", "📚 追加した科目の削除"])
@@ -260,7 +279,10 @@ with st.expander("⚙️ ユーザー・科目の管理（削除）"):
                 sub_labels = [item["label"] for item in sub_list]
                 target_sub_label = st.selectbox("削除する科目を選んでください", sub_labels, key="del_sub_select")
                 
-                if st.button("この科目を削除する", type="primary"):
+                if st.button("this is ignored", type="primary", key="dummy_btn") == False: # UI placeholder
+                    pass
+                
+                if st.button("この科目を削除する", type="primary", key="del_sub_action"):
                     target_id = next(item["id"] for item in sub_list if item["label"] == target_sub_label)
                     try:
                         supabase.table("subjects").delete().eq("id", target_id).execute()
